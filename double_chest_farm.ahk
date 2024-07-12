@@ -16,6 +16,7 @@ if InStr(A_ScriptDir, "appdata")
 
 #Include %A_ScriptDir%/overlay_class.ahk
 #Include %A_ScriptDir%/Gdip_all.ahk
+#Include %A_ScriptDir%/settings_and_cvars.ahk
 pToken := Gdip_Startup()
 
 global DEBUG := false
@@ -29,7 +30,13 @@ global DESTINY_Y := 0
 global DESTINY_WIDTH := 0
 global DESTINY_HEIGHT := 0
 
+global user_settings = get_settings(settings_we_change)
+modify_cvars(settings_we_need)
+
+
+
 find_d2()
+
 
 WinGet, D2PID, PID, ahk_class Tiger D3D Window
 if(IsAdminProcess(D2PID)) {
@@ -168,8 +175,11 @@ keys_we_press := [
     ,"ui_open_director" ; map
     ,"ui_open_start_menu_settings_tab"]
 
+
+
 global key_binds := get_d2_keybinds(keys_we_press) ; this gives us a dictionary of keybinds
 
+;global required_settings := 
 for key, value in key_binds ; make sure the keybinds are set (except for settings, dont technically need that one but having it bound speeds it up)
 {
     if (!value)
@@ -191,7 +201,7 @@ return
 ; =================================== ;
 
 ; hotkey to help make menuing while devving
-; F2::get_mouse_pos_relative_to_d2()
+ F2::get_mouse_pos_relative_to_d2()
 
 F3:: ; main hotkey that runs the script
 {
@@ -311,12 +321,12 @@ F3:: ; main hotkey that runs the script
     return
 }
 
-F6::
-{
-    WinGetPos,,, Width, Height, ahk_exe destiny2.exe
-    WinMove, ahk_exe destiny2.exe,, (A_ScreenWidth/2)-(Width/2), (A_ScreenHeight/2)-(Height/2)
-    ; we also want it to reload script so gui is in the right spot
-}
+;F6::
+;{
+;    WinGetPos,,, Width, Height, ahk_exe destiny2.exe
+;    WinMove, ahk_exe destiny2.exe,, (A_ScreenWidth/2)-(Width/2), (A_ScreenHeight/2)-(Height/2)
+;    ; we also want it to reload script so gui is in the right spot
+;}
 
 *F4:: ; reload the script, release any possible held keys, save stats
 {
@@ -334,6 +344,7 @@ F5:: ; same thing but close the script
         send, % "{" value " Up}"
     ; save all the stats to the afk_chest_stats.ini file
     write_stats()
+    modify_cvars(user_settings)
     ExitApp
 }
 
@@ -342,6 +353,44 @@ F5:: ; same thing but close the script
 ;     GoSub, check_for_exotic_drop
 ;     return
 ; }
+; hotkey i use to test random shit
+F6::
+{
+    ; settings = get_required_settings(settings_we_change)
+    if (!key_binds["ui_open_start_menu_settings_tab"])
+    {
+        Send, {F1}
+         Sleep, 3000
+        d2_click(1144, 38, 0)
+        Sleep, 100
+        d2_click(1144, 38)
+    }
+    else
+        Send, % "{" key_binds["ui_open_start_menu_settings_tab"] "}"
+    Sleep, 900
+    
+    
+    d2_click(211, 336) ; video
+    Sleep, 1100
+    d2_click(1187, 167, 0) ; goto window mode menu
+    Sleep, 100
+    d2_click(1187, 167) ; click on menu
+    Sleep, 1000
+    d2_click(1147, 201) ; set to windowed
+    Sleep, 2500
+    d2_click(1184, 273, 0) ; click on framerate cap enabled to enable it
+    Sleep, 100
+    d2_click(1184, 273)
+    Sleep, 1000
+
+    Send {Enter}
+    Sleep, 500
+    Send {Enter}
+
+
+
+    return
+}
 
 ; in game functions
 ; =================================== ;
@@ -1298,6 +1347,29 @@ get_d2_keybinds(k) ; very readable function that parses destiny 2 cvars file for
     b := {}, t := {"shift": "LShift", "control": "LCtrl", "alt": "LAlt", "menu": "AppsKey", "insert": "Ins", "delete": "Del", "pageup": "PgUp", "pagedown": "PgDn", "keypad`/": "NumpadDiv", "keypad`*": "NumpadMult", "keypad`-": "NumpadSub", "keypad`+": "NumpadAdd", "keypadenter": "NumpadEnter", "leftmousebutton": "LButton", "middlemousebutton": "MButton", "rightmousebutton": "RButton", "extramousebutton1": "XButton1", "extramousebutton2": "XButton2", "mousewheelup": "WheelUp", "mousewheeldown": "WheelDown", "escape": "Esc"}
     for _, n in k 
         RegExMatch(f, "<cvar\s+name=""`" n `"""\s+value=""([^""]+)""", m) ? b[n] := t.HasKey(k2 := StrReplace((k1 := StrSplit(m1, "!")[1]) != "unused" ? k1 : k1[2], " ", "")) ? t[k2] : k2 : b[n] := "unused"
+    return b
+}
+
+get_required_settings(k)
+{
+    FileRead, f, % A_AppData "\Bungie\DestinyPC\prefs\cvars.xml"
+    if ErrorLevel
+        return False
+
+    b := {}
+    for _, n in k
+        {
+        pattern := "<cvar\s+name=""" n """\s+value=""([^""]+)""\s*/?>"
+        if RegExMatch(f, pattern, m)
+        {
+            value := m1 ; m1 contains the value matched by ([^""]+)
+            MsgBox, Key: %n% - Value: %value%
+        }
+        else
+        {
+            MsgBox, Key: %key% not found.
+        }
+    }
     return b
 }
 
